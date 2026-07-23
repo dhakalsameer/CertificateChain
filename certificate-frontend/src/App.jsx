@@ -215,7 +215,18 @@ export default function App() {
       const sameer = await getContract(SAMEER_ADDRESS, SAMEER_ABI);
 
       const filter = sameer.filters.Transfer(null, userAddr);
-      const events = await sameer.queryFilter(filter);
+      const currentBlock = await sameer.runner?.provider?.getBlockNumber?.() || 99999999;
+      const DEPLOY_BLOCK = 11086326;
+      const BATCH = 9000;
+      let allEvents = [];
+      for (let from = DEPLOY_BLOCK; from <= currentBlock; from += BATCH) {
+        const to = Math.min(from + BATCH - 1, currentBlock);
+        try {
+          const batch = await sameer.queryFilter(filter, from, to);
+          allEvents = allEvents.concat(batch);
+        } catch {}
+      }
+      const events = allEvents;
 
       const certs = await Promise.all(
         events.map(async (event) => {
