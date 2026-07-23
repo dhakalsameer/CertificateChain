@@ -105,7 +105,7 @@ export default function App() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [myCertificates, setMyCertificates] = useState([]);
   const [isLoadingMyCerts, setIsLoadingMyCerts] = useState(false);
-  const [activeTab, setActiveTab] = useState("verify");
+  const [activeTab, setActiveTab] = useState("mycerts");
   const [copied, setCopied] = useState(false);
   const [allCertificates, setAllCertificates] = useState([]);
   const [isLoadingAll, setIsLoadingAll] = useState(true);
@@ -746,7 +746,7 @@ export default function App() {
               </div>
             )}
 
-            {!isAdmin && activeTab === "mycerts" && (
+            {account && activeTab === "mycerts" && (
               <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
