@@ -166,6 +166,8 @@ export default function App() {
         } else {
           setIsAdmin(false);
           setMyCertificates([]);
+          setActiveTab("all");
+          fetchAllCertificates();
         }
       });
     }
