@@ -109,7 +109,7 @@ export default function App() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [myCertificates, setMyCertificates] = useState([]);
   const [isLoadingMyCerts, setIsLoadingMyCerts] = useState(false);
-  const [activeTab, setActiveTab] = useState("mycerts");
+  const [activeTab, setActiveTab] = useState("all");
   const [copied, setCopied] = useState(false);
   const [allCertificates, setAllCertificates] = useState([]);
   const [isLoadingAll, setIsLoadingAll] = useState(true);
