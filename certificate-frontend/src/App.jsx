@@ -555,7 +555,11 @@ export default function App() {
 
           <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
-              {["verify", "mycerts"].map((tab) => (
+              {(() => {
+                const tabs = ["all", "verify"];
+                if (account) tabs.push("mycerts");
+                return tabs;
+              })().map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -566,7 +570,9 @@ export default function App() {
                   }`}
                   style={{ color: activeTab === tab ? 'white' : 'var(--text-secondary)' }}
                 >
-                  {tab === "verify" ? "Verify" : `${account ? "My Credentials" : "All Credentials"}${(account ? myCertificates : allCertificates).length > 0 ? ` (${(account ? myCertificates : allCertificates).length})` : ""}`}
+                  {tab === "all" ? `All Credentials${allCertificates.length > 0 ? ` (${allCertificates.length})` : ""}` :
+                   tab === "verify" ? "Verify" :
+                   `My Credentials${myCertificates.length > 0 ? ` (${myCertificates.length})` : ""}`}
                 </button>
               ))}
             </div>
@@ -623,7 +629,7 @@ export default function App() {
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           <div className="lg:col-span-3 space-y-6">
-            {!account && activeTab === "mycerts" && (
+            {activeTab === "all" && (
               <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
