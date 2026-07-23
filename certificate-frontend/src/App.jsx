@@ -113,6 +113,7 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [allCertificates, setAllCertificates] = useState([]);
   const [isLoadingAll, setIsLoadingAll] = useState(true);
+  const [expandedId, setExpandedId] = useState(null);
   const [adminTab, setAdminTab] = useState("issue");
   const [revokeHash, setRevokeHash] = useState("");
   const [isRevoking, setIsRevoking] = useState(false);
@@ -671,8 +672,9 @@ export default function App() {
                     allCertificates.map((cert, i) => (
                       <div
                         key={cert.id}
-                        className="card-elevated p-5 animate-slide-up"
+                        className="card-elevated p-5 animate-slide-up cursor-pointer transition-all hover:shadow-md"
                         style={{ animationDelay: `${0.1 + i * 0.05}s` }}
+                        onClick={() => setExpandedId(expandedId === cert.id ? null : cert.id)}
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div>
@@ -689,7 +691,7 @@ export default function App() {
                           <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                             {new Date(cert.issuedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                           </span>
-                          <div className="flex gap-3">
+                          <div className="flex gap-3" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => { setVerifyHash(cert.certificateHash); setVerifyFile(null); setGeneratedVerifyHash(""); setResult(""); setCertificateData(null); setActiveTab("verify"); }}
                               className="text-xs font-semibold inline-flex items-center gap-1 hover:text-emerald-500 transition-colors"
@@ -717,6 +719,24 @@ export default function App() {
                             </a>
                           </div>
                         </div>
+                        {expandedId === cert.id && (
+                          <div className="mt-4 pt-4 animate-slide-up" style={{ borderTop: '1px solid var(--card-border)' }}>
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div>
+                                <p className="font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Grade</p>
+                                <p style={{ color: 'var(--text-primary)' }}>{cert.grade}</p>
+                              </div>
+                              <div>
+                                <p className="font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Issuer</p>
+                                <p className="font-mono truncate" style={{ color: 'var(--text-secondary)' }}>{cert.studentAddress}</p>
+                              </div>
+                            </div>
+                            <div className="mt-3 p-3 rounded-lg text-xs font-mono break-all" style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
+                              <p className="font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Certificate Hash</p>
+                              <p style={{ color: 'var(--text-secondary)' }}>{cert.certificateHash}</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))
                   ) : (
