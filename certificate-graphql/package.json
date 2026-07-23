@@ -1,0 +1,19 @@
+{
+  "name": "certificate-graphql",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "seed": "node src/seed.js"
+  },
+  "dependencies": {
+    "@apollo/server": "^4.11.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.16.0",
+    "express": "^4.21.1",
+    "graphql": "^16.10.0"
+  }
+}

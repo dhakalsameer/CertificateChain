@@ -12,6 +12,19 @@ const SAMEER_ADDRESS = "0x3ff7bF2CC03fa79eFd17F19FeeE03Dc0E0973dcA";
 const REGISTRY_ABI = registryJson.abi || registryJson;
 const SAMEER_ABI = sameerJson.abi || sameerJson;
 
+const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || "http://localhost:4000/graphql";
+
+async function gql(query, variables = {}) {
+  const res = await fetch(GRAPHQL_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables }),
+  });
+  const json = await res.json();
+  if (json.errors) throw new Error(json.errors[0].message);
+  return json.data;
+}
+
 function TrimmedAddr({ addr }) {
   return <>{addr.slice(0, 6)}...{addr.slice(-4)}</>;
 }
@@ -71,7 +84,7 @@ function IconCopy({ className }) {
 export default function App() {
   const [account, setAccount] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
-  const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
+  const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
   const [mounted, setMounted] = useState(false);
 
   const [form, setForm] = useState({
@@ -93,6 +106,8 @@ export default function App() {
   const [isLoadingMyCerts, setIsLoadingMyCerts] = useState(false);
   const [activeTab, setActiveTab] = useState("verify");
   const [copied, setCopied] = useState(false);
+  const [allCertificates, setAllCertificates] = useState([]);
+  const [isLoadingAll, setIsLoadingAll] = useState(true);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -141,6 +156,55 @@ export default function App() {
       });
     }
   }, []);
+
+  useEffect(() => {
+    fetchAllCertificates();
+  }, []);
+
+  const fetchAllCertificates = async () => {
+    try {
+      setIsLoadingAll(true);
+      const data = await gql(`
+        query {
+          certificates {
+            id tokenId studentName regNo course grade certificateHash ipfsHash nftMinted issuedAt
+          }
+        }
+      `);
+      setAllCertificates(data.certificates);
+    } catch (err) {
+      console.log("GraphQL not available, showing on-chain data only");
+      setAllCertificates([]);
+    } finally {
+      setIsLoadingAll(false);
+    }
+  };
+
+  const syncCertificateToGraphql = async (tokenId, formData, certHash, ipfsHash, nftSuccess) => {
+    try {
+      await gql(`
+        mutation($input: CertificateInput!) {
+          addCertificate(input: $input) { id }
+        }
+      `, {
+        input: {
+          tokenId: String(tokenId || "0"),
+          studentName: formData.studentName,
+          regNo: formData.regNo,
+          course: formData.course,
+          grade: formData.grade,
+          certificateHash: certHash,
+          ipfsHash: ipfsHash,
+          studentAddress: formData.studentAddress.toLowerCase(),
+          nftMinted: nftSuccess,
+          issuedAt: Date.now(),
+        },
+      });
+      fetchAllCertificates();
+    } catch (err) {
+      console.log("GraphQL sync skipped (server may be offline)");
+    }
+  };
 
   const fetchMyCertificates = async (userAddr) => {
     if (!userAddr) return;
@@ -221,10 +285,13 @@ export default function App() {
   };
 
   const getContract = async (address, abi) => {
-    if (!window.ethereum) throw new Error("MetaMask is not installed");
-    const provider = new BrowserProvider(window.ethereum);
-    const signer = await provider.getSigner();
-    return new Contract(address, abi, signer);
+    if (window.ethereum) {
+      const provider = new BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      return new Contract(address, abi, signer);
+    }
+    const provider = new ethers.JsonRpcProvider("https://rpc.sepolia.org");
+    return new Contract(address, abi, provider);
   };
 
   const handleChange = (e) => {
@@ -259,15 +326,21 @@ export default function App() {
       await tx1.wait();
 
       let nftSuccess = false;
+      let tokenId = "0";
       try {
         const tx2 = await sameer.mintCertificateNFT(form.studentAddress, certHash);
-        await tx2.wait();
+        const receipt = await tx2.wait();
+        const transferLog = receipt.logs.find(l => l.topics[0] === sameer.interface.getEvent("Transfer").topicHash);
+        if (transferLog) {
+          tokenId = ethers.AbiCoder.defaultAbiCoder().decode(["uint256"], transferLog.topics[3])[0].toString();
+        }
         nftSuccess = true;
       } catch (nftErr) {
         console.error("NFT Minting failed:", nftErr);
       }
 
       setIssued({ certHash, ipfsHash, nftSuccess });
+      syncCertificateToGraphql(tokenId, form, certHash, ipfsHash, nftSuccess);
       setForm({ studentName: "", regNo: "", course: "", grade: "", studentAddress: "" });
       setIssueFile(null);
       setIssueHash("");
@@ -404,7 +477,7 @@ export default function App() {
                   }`}
                   style={{ color: activeTab === tab ? 'white' : 'var(--text-secondary)' }}
                 >
-                  {tab === "verify" ? "Verify" : `My Credentials${myCertificates.length > 0 ? ` (${myCertificates.length})` : ""}`}
+                  {tab === "verify" ? "Verify" : `${account ? "My Credentials" : "All Credentials"}${(account ? myCertificates : allCertificates).length > 0 ? ` (${(account ? myCertificates : allCertificates).length})` : ""}`}
                 </button>
               ))}
             </div>
@@ -461,6 +534,89 @@ export default function App() {
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           <div className="lg:col-span-3 space-y-6">
+            {!account && activeTab === "mycerts" && (
+              <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                      <rect x="3" y="3" width="18" height="18" rx="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M3 9h18M9 21V9" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold">Issued Certificates</h2>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>All blockchain-verified credentials</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {isLoadingAll ? (
+                    <div className="card-elevated p-12 flex flex-col items-center justify-center gap-4">
+                      <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin-slow" />
+                      <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Loading certificates...</p>
+                    </div>
+                  ) : allCertificates.length > 0 ? (
+                    allCertificates.map((cert, i) => (
+                      <div
+                        key={cert.id}
+                        className="card-elevated p-5 animate-slide-up"
+                        style={{ animationDelay: `${0.1 + i * 0.05}s` }}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h3 className="text-base font-bold">{cert.course}</h3>
+                            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                              {cert.studentName} &middot; {cert.regNo}
+                            </p>
+                          </div>
+                          <span className="shrink-0 px-3 py-1 rounded-full text-[10px] font-semibold bg-gradient-to-r from-purple-500/10 to-pink-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                            #{cert.tokenId}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid var(--card-border)' }}>
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            {new Date(cert.issuedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                          </span>
+                          <div className="flex gap-3">
+                            <a
+                              href={`https://sepolia.etherscan.io/token/${SAMEER_ADDRESS}?a=${cert.tokenId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs font-semibold inline-flex items-center gap-1 hover:text-purple-500 transition-colors"
+                              style={{ color: 'var(--text-secondary)' }}
+                            >
+                              Explorer <IconExternal />
+                            </a>
+                            <a
+                              href={`https://gateway.pinata.cloud/ipfs/${cert.ipfsHash}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs font-semibold inline-flex items-center gap-1 hover:text-green-500 transition-colors"
+                              style={{ color: 'var(--text-secondary)' }}
+                            >
+                              IPFS <IconExternal />
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="card-elevated p-12 text-center">
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--card)' }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-7 h-7" style={{ color: 'var(--text-muted)' }}>
+                          <path d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                      <h3 className="text-base font-semibold mb-1">No certificates issued yet</h3>
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        Certificates will appear here once they are issued on-chain.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {isAdmin && (
               <div className="card-elevated p-6 sm:p-8 animate-slide-up" style={{ animationDelay: '0.1s' }}>
                 <div className="flex items-center gap-3 mb-8">
