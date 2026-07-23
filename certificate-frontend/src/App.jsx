@@ -6,25 +6,76 @@ import sameerJson from "./abi/Sameer.json";
 import { generateFileHash } from "./utils/hash";
 import { uploadFileToPinata } from "./utils/pinata";
 
-// REGISTRY_ADDRESS is the core contract where certificates are stored
 const REGISTRY_ADDRESS = "0x871086DA3fA39378DDaaae6c2CA79ec1bac5a92C";
-// SAMEER_ADDRESS is the NFT contract (Newly redeployed)
 const SAMEER_ADDRESS = "0x3ff7bF2CC03fa79eFd17F19FeeE03Dc0E0973dcA";
 
 const REGISTRY_ABI = registryJson.abi || registryJson;
 const SAMEER_ABI = sameerJson.abi || sameerJson;
 
+function TrimmedAddr({ addr }) {
+  return <>{addr.slice(0, 6)}...{addr.slice(-4)}</>;
+}
+
+function IconShield() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
+      <path d="M12 3L4 7v5c0 5.25 3.83 10.08 8 11 4.17-.92 8-5.75 8-11V7l-8-4z" fill="currentColor" opacity="0.2"/>
+      <path d="M12 3L4 7v5c0 5.25 3.83 10.08 8 11V3z" fill="url(#brand)" opacity="0.4"/>
+      <path d="M12 3L4 7v5c0 5.25 3.83 10.08 8 11 4.17-.92 8-5.75 8-11V7l-8-4z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function IconPlus() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+      <path d="M12 5v14M5 12h14" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function IconUpload() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6">
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4">
+      <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function IconExternal() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function IconCopy({ className }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`w-3.5 h-3.5 ${className}`}>
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
 export default function App() {
   const [account, setAccount] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
-  const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
+  const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
+  const [mounted, setMounted] = useState(false);
 
   const [form, setForm] = useState({
-    studentName: "",
-    regNo: "",
-    course: "",
-    grade: "",
-    studentAddress: "",
+    studentName: "", regNo: "", course: "", grade: "", studentAddress: "",
   });
 
   const [issueFile, setIssueFile] = useState(null);
@@ -40,9 +91,11 @@ export default function App() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [myCertificates, setMyCertificates] = useState([]);
   const [isLoadingMyCerts, setIsLoadingMyCerts] = useState(false);
-  const [activeTab, setActiveTab] = useState("verify"); // "verify" or "mycerts"
+  const [activeTab, setActiveTab] = useState("verify");
+  const [copied, setCopied] = useState(false);
 
-  // Auto-generate hash when file is selected for issuance
+  useEffect(() => { setMounted(true); }, []);
+
   useEffect(() => {
     if (issueFile) {
       generateFileHash(issueFile).then(setIssueHash);
@@ -51,7 +104,6 @@ export default function App() {
     }
   }, [issueFile]);
 
-  // Auto-generate hash when file is selected for verification
   useEffect(() => {
     if (verifyFile) {
       generateFileHash(verifyFile).then(setGeneratedVerifyHash);
@@ -67,7 +119,6 @@ export default function App() {
 
   useEffect(() => {
     if (window.ethereum) {
-      // Check initial account
       window.ethereum.request({ method: 'eth_accounts' }).then(accounts => {
         if (accounts.length > 0) {
           const acc = accounts[0];
@@ -98,7 +149,6 @@ export default function App() {
       const registry = await getContract(REGISTRY_ADDRESS, REGISTRY_ABI);
       const sameer = await getContract(SAMEER_ADDRESS, SAMEER_ABI);
 
-      // Fetch all Transfer events to the user (to find token IDs)
       const filter = sameer.filters.Transfer(null, userAddr);
       const events = await sameer.queryFilter(filter);
 
@@ -134,25 +184,22 @@ export default function App() {
 
   const checkAdminStatus = async (addr) => {
     try {
-      console.log("Checking admin status for:", addr);
       const contract = await getContract(REGISTRY_ADDRESS, REGISTRY_ABI);
-      
+
       let status = false;
       try {
         status = await contract.isAdmin(addr);
       } catch (e) {
-        console.warn("isAdmin() call failed, trying admins mapping:", e.message);
         try {
           status = await contract.admins(addr);
         } catch (e2) {
-          console.error("Both isAdmin() and admins mapping failed. Check if REGISTRY_ADDRESS is correct.");
+          console.error("Admin check failed");
         }
       }
-      
-      console.log("Admin status result:", status);
+
       setIsAdmin(!!status);
     } catch (err) {
-      console.error("Critical Admin Check Error:", err);
+      console.error("Admin Check Error:", err);
       setIsAdmin(false);
     }
   };
@@ -187,39 +234,30 @@ export default function App() {
   const issueCertificate = async () => {
     try {
       if (!form.studentName || !form.regNo || !form.course || !form.grade || !form.studentAddress || !issueFile) {
-        alert("Please fill all fields and upload a file ✍️");
+        alert("Please fill all fields and upload a file");
         return;
       }
 
       if (!ethers.isAddress(form.studentAddress)) {
-        alert("Invalid student wallet address ❌");
+        alert("Invalid student wallet address");
         return;
       }
 
       setIsIssuing(true);
       const registry = await getContract(REGISTRY_ADDRESS, REGISTRY_ABI);
       const sameer = await getContract(SAMEER_ADDRESS, SAMEER_ABI);
-      
+
       const certHash = issueHash || await generateFileHash(issueFile);
       const ipfsHash = await uploadFileToPinata(issueFile, {
         name: `Cert: ${form.studentName}`,
         keyvalues: { student: form.studentName, reg: form.regNo }
       });
 
-      // 1. Register in Registry
-      console.log("Step 1: Registering certificate in Registry...");
       const tx1 = await registry.issueCertificate(
-        form.studentName,
-        form.regNo,
-        form.course,
-        form.grade,
-        certHash,
-        ipfsHash
+        form.studentName, form.regNo, form.course, form.grade, certHash, ipfsHash
       );
       await tx1.wait();
 
-      // 2. Mint Soulbound NFT
-      console.log("Step 2: Minting Soulbound NFT...");
       let nftSuccess = false;
       try {
         const tx2 = await sameer.mintCertificateNFT(form.studentAddress, certHash);
@@ -233,7 +271,6 @@ export default function App() {
       setForm({ studentName: "", regNo: "", course: "", grade: "", studentAddress: "" });
       setIssueFile(null);
       setIssueHash("");
-      alert("Success! Certificate and Soulbound NFT processed. ✅");
       fetchMyCertificates(account);
     } catch (err) {
       console.error("Issuance Error:", err);
@@ -263,7 +300,7 @@ export default function App() {
       const valid = await registry.verifyCertificate(hashToVerify);
 
       if (!valid) {
-        setResult("INVALID ❌");
+        setResult("INVALID");
         setCertificateData(null);
         return;
       }
@@ -278,242 +315,345 @@ export default function App() {
         grade: cert.grade,
         certificateHash: cert.certificateHash,
         ipfsHash: cert.ipfsHash,
-        nftStatus: nftMinted ? "MINTED 🔥" : "NOT MINTED"
+        nftStatus: nftMinted ? "MINTED" : "NOT MINTED"
       });
-      setResult("VALID CERTIFICATE ✅");
+      setResult("VALID");
     } catch (err) {
       console.error(err);
-      setResult("NOT FOUND ❌");
+      setResult("NOT_FOUND");
       setCertificateData(null);
     } finally {
       setIsVerifying(false);
     }
   };
 
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+        <div className="w-8 h-8 rounded-full border-2 border-brand-500 border-t-transparent animate-spin-slow" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen pb-20 transition-colors duration-300">
-      {/* Navbar */}
-      <nav className="sticky top-0 z-50 bg-white/70 dark:bg-slate-900/70 backdrop-blur-lg border-b border-slate-200 dark:border-slate-800">
-        <div className="max-w-6xl mx-auto px-6 h-20 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <span className="text-2xl">🎓</span>
-            <span className="text-xl font-bold tracking-tight text-slate-800 dark:text-white">
-              Certi<span className="text-primary">Chain</span>
-            </span>
+    <div className="min-h-screen relative" style={{ background: 'var(--bg)' }}>
+      <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: theme === 'dark' ? 0.03 : 0.02 }}>
+        <defs>
+          <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#a855f7" />
+            <stop offset="100%" stopColor="#ec4899" />
+          </linearGradient>
+          <radialGradient id="orb1" cx="20%" cy="30%" r="50%">
+            <stop offset="0%" stopColor="#a855f7" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
+          </radialGradient>
+          <radialGradient id="orb2" cx="80%" cy="70%" r="50%">
+            <stop offset="0%" stopColor="#ec4899" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#ec4899" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+      </svg>
+
+      <div className="glow-orb w-[600px] h-[600px] -top-48 -left-48" style={{ background: 'radial-gradient(circle, rgba(168,85,247,0.12) 0%, transparent 70%)' }} />
+      <div className="glow-orb w-[500px] h-[500px] -bottom-32 -right-32" style={{ background: 'radial-gradient(circle, rgba(236,72,153,0.08) 0%, transparent 70%)' }} />
+
+      <nav className="sticky top-0 z-50" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--card-border)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
+              <IconShield />
+            </div>
+            <div>
+              <span className="text-base font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                CredVerify
+              </span>
+              <span className="text-[10px] font-medium ml-2 px-2 py-0.5 rounded-full" style={{ background: 'var(--card)', color: 'var(--text-secondary)', border: '1px solid var(--card-border)' }}>
+                Sepolia
+              </span>
+            </div>
             {account && (
-              <span className={`role-badge ml-3 ${isAdmin ? "role-badge-admin" : "role-badge-user"}`}>
-                {isAdmin ? "Admin" : "Public User"}
+              <span className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold ${
+                isAdmin
+                  ? 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isAdmin ? 'bg-purple-500 animate-pulse-soft' : 'bg-zinc-400'}`} />
+                {isAdmin ? "Admin" : "Verified"}
               </span>
             )}
           </div>
-          
-          <div className="flex items-center space-x-6">
-            <div className="hidden md:flex items-center space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-               <button 
-                onClick={() => setActiveTab("verify")}
-                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === "verify" ? "bg-white dark:bg-slate-700 text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-               >
-                 Verify
-               </button>
-               <button 
-                onClick={() => setActiveTab("mycerts")}
-                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === "mycerts" ? "bg-white dark:bg-slate-700 text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-               >
-                 My Credentials {myCertificates.length > 0 && `(${myCertificates.length})`}
-               </button>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
+              {["verify", "mycerts"].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    activeTab === tab
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm'
+                      : 'hover:text-purple-500 dark:hover:text-purple-400'
+                  }`}
+                  style={{ color: activeTab === tab ? 'white' : 'var(--text-secondary)' }}
+                >
+                  {tab === "verify" ? "Verify" : `My Credentials${myCertificates.length > 0 ? ` (${myCertificates.length})` : ""}`}
+                </button>
+              ))}
             </div>
 
-            <button 
+            <button
               onClick={toggleTheme}
-              className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:scale-105"
+              style={{ background: 'var(--card)', border: '1px solid var(--card-border)', color: 'var(--text-secondary)' }}
             >
-              {theme === "light" ? "🌙" : "☀️"}
+              {theme === "light" ? (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                  <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                  <circle cx="12" cy="12" r="5"/>
+                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeLinecap="round"/>
+                </svg>
+              )}
             </button>
 
             <button
               onClick={connectWallet}
-              className={`flex items-center space-x-2 px-5 py-2.5 rounded-full font-medium transition-all ${
-                account 
-                  ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300" 
-                  : "bg-primary text-white hover:bg-primary-dark shadow-lg shadow-primary/20"
+              className={`h-9 px-4 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+                account
+                  ? 'border'
+                  : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30'
               }`}
+              style={account ? { background: 'var(--card)', border: '1px solid var(--card-border)', color: 'var(--text-primary)' } : {}}
             >
-              <span className={`w-2 h-2 rounded-full ${account ? "bg-accent animate-pulse" : "bg-white/50"}`}></span>
-              <span className="hidden sm:inline">{account ? `${account.slice(0, 6)}...${account.slice(-4)}` : "Connect Wallet"}</span>
+              <span className={`w-1.5 h-1.5 rounded-full ${account ? 'bg-green-500 animate-pulse-soft' : 'bg-white/60'}`} />
+              <span className="hidden sm:inline">
+                {account ? <TrimmedAddr addr={account} /> : "Connect Wallet"}
+              </span>
               <span className="sm:hidden">{account ? "Connected" : "Connect"}</span>
             </button>
           </div>
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto px-6 pt-12">
-        {/* Hero Section */}
-        <section className="text-center mb-16 space-y-4">
-          <h2 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">
-            <span className="gradient-text">Immutable Academic Proof</span>
-          </h2>
-          <p className="text-base md:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto px-4 font-medium">
-            Secure, verifiable, and permanent certificates powered by Ethereum and IPFS. 
+      <main className="max-w-6xl mx-auto px-6 pt-10 pb-20 relative z-10">
+        <div className="text-center mb-10 animate-fade-in">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium mb-4" style={{ background: 'var(--card)', border: '1px solid var(--card-border)', color: 'var(--text-secondary)' }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse-soft" />
+            Ethereum Sepolia
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-3" style={{ color: 'var(--text-primary)' }}>
+            Immutable Academic Credentials
+          </h1>
+          <p className="text-sm sm:text-base max-w-lg mx-auto" style={{ color: 'var(--text-secondary)' }}>
+            Issue, verify, and own blockchain-secured certificates powered by Ethereum & IPFS.
           </p>
-        </section>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          
-          {/* Left Column: Issue (Admin) or MyCertificates (User) */}
-          <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-3 space-y-6">
             {isAdmin && (
-              <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-                <div className="flex items-center space-x-3 mb-6">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-600 shadow-lg shadow-indigo-600/20 flex items-center justify-center text-white">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
+              <div className="card-elevated p-6 sm:p-8 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
+                    <IconPlus />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100">Issuer Console</h3>
-                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Authorized Management</p>
+                    <h2 className="text-lg font-bold">Issue Certificate</h2>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Authorized Issuance Console</p>
                   </div>
                 </div>
 
-                <div className="glass-card p-8 md:p-10 rounded-[2.5rem] space-y-8 border-slate-200/60">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {[
-                      { label: "Student Name", name: "studentName", placeholder: "e.g. Sameer Dhakal" },
-                      { label: "Registration ID", name: "regNo", placeholder: "e.g. GUST3030" },
-                      { label: "Course Title", name: "course", placeholder: "e.g. BSc.CSIT" },
-                      { label: "Grade", name: "grade", placeholder: "e.g. B+" },
-                      { label: "Student Wallet Address", name: "studentAddress", placeholder: "0x..." }
-                    ].map((field) => (
-                      <div key={field.name} className={`space-y-1 ${field.name === "studentAddress" ? "md:col-span-2" : ""}`}>
-                        <label className="label-text">{field.label}</label>
-                        <input
-                          name={field.name}
-                          value={form[field.name]}
-                          onChange={handleChange}
-                          placeholder={field.placeholder}
-                          className="input-field"
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="label-text">Certificate Document</label>
-                    <div className="relative group">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                  {[
+                    { label: "Student Name", name: "studentName", placeholder: "e.g. Sameer Dhakal" },
+                    { label: "Registration ID", name: "regNo", placeholder: "e.g. GUST3030" },
+                    { label: "Course Title", name: "course", placeholder: "e.g. BSc.CSIT" },
+                    { label: "Grade", name: "grade", placeholder: "e.g. B+" },
+                    { label: "Student Wallet", name: "studentAddress", placeholder: "0x..." }
+                  ].map((field) => (
+                    <div key={field.name} className={`space-y-1 ${field.name === "studentAddress" ? "sm:col-span-2" : ""}`}>
+                      <label className="label">{field.label}</label>
                       <input
-                        type="file"
-                        onChange={(e) => setIssueFile(e.target.files[0])}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        name={field.name}
+                        value={form[field.name]}
+                        onChange={handleChange}
+                        placeholder={field.placeholder}
+                        className="input"
                       />
-                      <div className="p-4 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50 group-hover:border-primary group-hover:bg-primary/5 transition-all flex items-center justify-center space-x-3">
-                        <svg className="w-5 h-5 text-slate-500 group-hover:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                        <span className="text-sm font-bold text-slate-600 dark:text-slate-400 group-hover:text-primary truncate max-w-[200px]">
-                          {issueFile ? issueFile.name : "Select Document"}
-                        </span>
-                      </div>
                     </div>
-                    {issueHash && (
-                      <p className="mt-2 text-[10px] text-slate-500 font-mono bg-slate-100 dark:bg-slate-800/50 p-2 rounded-lg break-all">
-                        <span className="font-black uppercase mr-2">Generated Hash:</span> {issueHash}
-                      </p>
-                    )}
-                  </div>
+                  ))}
+                </div>
 
-                  <button
-                    onClick={issueCertificate}
-                    disabled={isIssuing}
-                    className="btn-primary w-full py-4 text-lg"
-                  >
-                    {isIssuing ? "Processing..." : "Issue & Mint NFT"}
-                  </button>
-
-                  {issued && (
-                    <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 rounded-2xl animate-in zoom-in-95 space-y-2">
-                      <p className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center text-xs uppercase tracking-widest">
-                        <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        {issued.nftSuccess ? "Success: Registry Updated & NFT Minted" : "Partial Success: Registry Updated"}
-                      </p>
-                      <div className="text-[10px] text-slate-500 break-all bg-white/50 dark:bg-black/20 p-2 rounded-lg">
-                        <b>Hash:</b> {issued.certHash}
+                <div className="mb-6">
+                  <label className="label mb-2">Certificate Document</label>
+                  <div className="relative group">
+                    <input
+                      type="file"
+                      onChange={(e) => setIssueFile(e.target.files[0])}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+                    <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-dashed transition-all group-hover:border-purple-400 group-hover:bg-purple-500/5" style={{ borderColor: 'var(--input-border)', background: 'var(--input-bg)' }}>
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'var(--card)' }}>
+                        <IconUpload />
                       </div>
-                      <a 
-                        href={`https://gateway.pinata.cloud/ipfs/${issued.ipfsHash}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-primary font-bold hover:underline inline-flex items-center"
-                      >
-                        Verify Document on IPFS ↗
-                      </a>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                          {issueFile ? issueFile.name : "Choose a file or drag here"}
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          PDF, PNG, JPG up to 10MB
+                        </p>
+                      </div>
+                      {issueFile && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setIssueFile(null); }}
+                          className="text-xs font-semibold px-3 py-1 rounded-lg hover:bg-red-500/10"
+                          style={{ color: '#ef4444' }}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {issueHash && (
+                    <div className="mt-3 flex items-center gap-2 p-3 rounded-lg text-xs font-mono" style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
+                      <span className="font-medium" style={{ color: 'var(--text-muted)' }}>SHA-256:</span>
+                      <span className="truncate" style={{ color: 'var(--text-secondary)' }}>{issueHash}</span>
+                      <button onClick={() => copyToClipboard(issueHash)} className="shrink-0 hover:text-purple-500 transition-colors" style={{ color: 'var(--text-muted)' }}>
+                        {copied ? <span className="text-green-500 text-xs font-medium">Copied!</span> : <IconCopy />}
+                      </button>
                     </div>
                   )}
                 </div>
+
+                <button
+                  onClick={issueCertificate}
+                  disabled={isIssuing}
+                  className="btn btn-primary w-full h-12"
+                >
+                  {isIssuing ? (
+                    <>
+                      <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Issue & Mint NFT"
+                  )}
+                </button>
+
+                {issued && (
+                  <div className="mt-4 p-4 rounded-xl animate-slide-up" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white">
+                        <IconCheck />
+                      </div>
+                      <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+                        {issued.nftSuccess ? "Certificate Issued & NFT Minted" : "Certificate Issued"}
+                      </span>
+                    </div>
+                    <div className="text-xs font-mono break-all opacity-70 mb-2" style={{ color: 'var(--text-secondary)' }}>
+                      {issued.certHash}
+                    </div>
+                    <a
+                      href={`https://gateway.pinata.cloud/ipfs/${issued.ipfsHash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-semibold inline-flex items-center gap-1 text-purple-600 dark:text-purple-400 hover:underline"
+                    >
+                      View on IPFS <IconExternal />
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 
             {!isAdmin && activeTab === "mycerts" && (
-              <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-                <div className="flex items-center space-x-3 mb-6">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-600 shadow-lg shadow-indigo-600/20 flex items-center justify-center text-white">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                      <rect x="3" y="3" width="18" height="18" rx="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M3 9h18M9 21V9" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100">My Credentials</h3>
-                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Your Soulbound Identity</p>
+                    <h2 className="text-lg font-bold">My Credentials</h2>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Your soulbound certificate collection</p>
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {isLoadingMyCerts ? (
-                    <div className="glass-card p-12 rounded-[2.5rem] flex flex-col items-center justify-center space-y-4">
-                      <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-sm font-bold text-slate-500">Scanning blockchain for your badges...</p>
+                    <div className="card-elevated p-12 flex flex-col items-center justify-center gap-4">
+                      <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin-slow" />
+                      <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Scanning blockchain...</p>
                     </div>
                   ) : myCertificates.length > 0 ? (
-                    myCertificates.map((cert) => (
-                      <div key={cert.tokenId} className="glass-card p-6 rounded-3xl space-y-4 hover:border-primary/50 transition-all group">
-                        <div className="flex justify-between items-start">
+                    myCertificates.map((cert, i) => (
+                      <div
+                        key={cert.tokenId}
+                        className="card-elevated p-5 animate-slide-up"
+                        style={{ animationDelay: `${0.1 + i * 0.05}s` }}
+                      >
+                        <div className="flex items-start justify-between mb-3">
                           <div>
-                            <h4 className="text-lg font-black text-slate-900 dark:text-white leading-none">{cert.course}</h4>
-                            <p className="text-xs text-slate-500 font-bold mt-1 uppercase tracking-wider">{cert.studentName} • {cert.regNo}</p>
+                            <h3 className="text-base font-bold">{cert.course}</h3>
+                            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                              {cert.studentName} &middot; {cert.regNo}
+                            </p>
                           </div>
-                          <span className="px-3 py-1 bg-accent text-white rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg shadow-accent/20">
-                             Token #{cert.tokenId}
+                          <span className="shrink-0 px-3 py-1 rounded-full text-[10px] font-semibold bg-gradient-to-r from-purple-500/10 to-pink-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                            #{cert.tokenId}
                           </span>
                         </div>
-                        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                          <p className="text-[10px] text-slate-400 font-medium">Issued on {new Date(cert.issuedAt).toLocaleDateString()}</p>
-                          <div className="flex space-x-2">
-                             <a 
+                        <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid var(--card-border)' }}>
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            {new Date(cert.issuedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                          </span>
+                          <div className="flex gap-3">
+                            <a
                               href={`https://sepolia.etherscan.io/token/${SAMEER_ADDRESS}?a=${cert.tokenId}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-[10px] font-black uppercase text-indigo-600 hover:underline"
+                              className="text-xs font-semibold inline-flex items-center gap-1 hover:text-purple-500 transition-colors"
+                              style={{ color: 'var(--text-secondary)' }}
                             >
-                              Explorer ↗
+                              Explorer <IconExternal />
                             </a>
-                             <a 
+                            <a
                               href={`https://gateway.pinata.cloud/ipfs/${cert.ipfsHash}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-[10px] font-black uppercase text-emerald-600 hover:underline"
+                              className="text-xs font-semibold inline-flex items-center gap-1 hover:text-green-500 transition-colors"
+                              style={{ color: 'var(--text-secondary)' }}
                             >
-                              IPFS ↗
+                              IPFS <IconExternal />
                             </a>
                           </div>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="glass-card p-12 rounded-[2.5rem] text-center space-y-4">
-                      <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto text-3xl">📭</div>
-                      <h4 className="text-xl font-bold">No Badges Found</h4>
-                      <p className="text-sm text-slate-500">You haven't received any soulbound certificates yet. Once issued, they will appear here automatically.</p>
+                    <div className="card-elevated p-12 text-center">
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--card)' }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-7 h-7" style={{ color: 'var(--text-muted)' }}>
+                          <path d="M12 15v2m0 0v2m0-2h2m-2 0H10m21-12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                      <h3 className="text-base font-semibold mb-1">No credentials yet</h3>
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        Connect your wallet to view your soulbound certificates.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -521,143 +661,181 @@ export default function App() {
             )}
 
             {!isAdmin && activeTab === "verify" && (
-               <div className="lg:flex items-center justify-center p-12 text-center glass-card rounded-[2.5rem] animate-in fade-in duration-700 min-h-[400px]">
-                  <div className="max-w-xs space-y-6">
-                    <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto text-4xl shadow-inner">🛡️</div>
-                    <div>
-                      <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Verification Portal</h3>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">Use the protocol on the right to verify any digital certificate against the Ethereum mainnet registry.</p>
-                    </div>
-                    <div className="pt-6 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-4">
-                       <div className="text-left">
-                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Network</p>
-                         <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Sepolia Testnet</p>
-                       </div>
-                       <div className="text-left">
-                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Standard</p>
-                         <p className="text-xs font-bold text-slate-700 dark:text-slate-300">ERC-721 SBT</p>
-                       </div>
-                    </div>
+              <div className="card-elevated p-8 sm:p-10 min-h-[300px] flex items-center justify-center text-center animate-fade-in">
+                <div className="max-w-xs">
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ background: 'var(--card)' }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8" style={{ color: 'var(--text-muted)' }}>
+                      <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                   </div>
-               </div>
+                  <h3 className="text-lg font-bold mb-2">Verification Portal</h3>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    Upload a certificate or enter its hash to verify authenticity on-chain.
+                  </p>
+                </div>
+              </div>
             )}
           </div>
 
-          {/* Right Column: Verify Section */}
-          <div className="space-y-6">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-600 shadow-lg shadow-emerald-600/20 flex items-center justify-center text-white">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.040L3 5.618a11.955 11.955 0 0112 21.382 11.955 11.955 0 018.618-15.764z" />
-                </svg>
+          <div className="lg:col-span-2 space-y-6">
+            <div className="card-elevated p-6 sm:p-8 animate-slide-up" style={{ animationDelay: '0.15s' }}>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                    <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">Verify Certificate</h2>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>On-chain authenticity check</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100">Audit Protocol</h3>
-                <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Public Verification Engine</p>
-              </div>
-            </div>
 
-            <div className="glass-card p-8 md:p-10 rounded-[2.5rem] space-y-8">
-              <div className="space-y-4">
-                <div className="relative group cursor-pointer space-y-1">
-                  <label className="label-text">Option 1: Verify via Original File</label>
+              <div className="space-y-5">
+                <div className="relative group">
+                  <label className="label mb-2">Upload file to verify</label>
                   <input
                     type="file"
                     onChange={(e) => { setVerifyFile(e.target.files[0]); setVerifyHash(""); }}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                   />
-                  <div className="p-8 border-2 border-dashed border-slate-300 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-900/30 flex flex-col items-center justify-center text-center transition-all group-hover:bg-slate-100 dark:group-hover:bg-slate-800/50">
-                    <div className="w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center mb-3">
-                      <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  <div className="flex flex-col items-center justify-center gap-2 p-8 rounded-xl border-2 border-dashed transition-all group-hover:border-purple-400 group-hover:bg-purple-500/5" style={{ borderColor: 'var(--input-border)', background: 'var(--input-bg)' }}>
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'var(--card)' }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6" style={{ color: 'var(--text-muted)' }}>
+                        <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </div>
-                    <p className="text-slate-800 dark:text-slate-300 font-bold">{verifyFile ? verifyFile.name : "Drag certificate file here"}</p>
-                    <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-widest font-black">Digital Fingerprint Analysis</p>
+                    <div className="text-center">
+                      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                        {verifyFile ? verifyFile.name : "Drop file or click to browse"}
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Hash computed client-side</p>
+                    </div>
+                    {verifyFile && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setVerifyFile(null); }}
+                        className="text-xs font-semibold px-3 py-1 rounded-lg hover:bg-red-500/10"
+                        style={{ color: '#ef4444' }}
+                      >
+                        Clear
+                      </button>
+                    )}
                   </div>
                   {generatedVerifyHash && (
-                    <p className="text-[9px] text-slate-400 font-mono mt-2 break-all px-2">
-                      <span className="font-bold">Calculated Hash:</span> {generatedVerifyHash}
-                    </p>
+                    <div className="mt-2 text-xs font-mono truncate px-1" style={{ color: 'var(--text-muted)' }}>
+                      Hash: {generatedVerifyHash}
+                    </div>
                   )}
                 </div>
 
                 <div className="relative">
-                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200 dark:border-slate-800"></div></div>
-                  <div className="relative flex justify-center text-[10px] uppercase"><span className="bg-white dark:bg-slate-900 px-3 text-slate-400 dark:text-slate-600 font-black tracking-widest">or</span></div>
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full" style={{ borderTop: '1px solid var(--card-border)' }} />
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="px-3 text-xs font-medium" style={{ background: 'var(--bg)', color: 'var(--text-muted)' }}>or</span>
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="label-text">Option 2: Verify via Blockchain Hash</label>
+                <div>
+                  <label className="label mb-2">Enter SHA-256 hash</label>
                   <input
                     value={verifyHash}
                     onChange={(e) => { setVerifyHash(e.target.value); setVerifyFile(null); setGeneratedVerifyHash(""); }}
-                    placeholder="Enter SHA256 string..."
-                    className="input-field"
+                    placeholder="Paste the certificate hash..."
+                    className="input"
                   />
                 </div>
-              </div>
 
-              <button
-                onClick={verifyCertificate}
-                disabled={isVerifying}
-                className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-2xl hover:bg-slate-800 dark:hover:bg-slate-200 transition-all shadow-xl shadow-slate-200 dark:shadow-none"
-              >
-                {isVerifying ? "Scanning Blockchain..." : "Verify Authenticity"}
-              </button>
+                <button
+                  onClick={verifyCertificate}
+                  disabled={isVerifying}
+                  className="btn btn-primary w-full h-12"
+                >
+                  {isVerifying ? (
+                    <>
+                      <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                      Scanning Blockchain...
+                    </>
+                  ) : (
+                    "Verify Authenticity"
+                  )}
+                </button>
 
-              {result && (
-                <div className={`p-4 rounded-2xl flex items-center space-x-3 animate-in zoom-in-95 ${
-                  result.includes("VALID") ? "bg-accent/10 text-accent border border-accent/20" : "bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-500/20"
-                }`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${result.includes("VALID") ? "bg-accent text-white" : "bg-rose-500 text-white"}`}>
-                    {result.includes("VALID") ? "✓" : "!"}
-                  </div>
-                  <span className="font-bold text-lg">{result}</span>
-                </div>
-              )}
-
-              {certificateData && (
-                <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm animate-in fade-in zoom-in-95">
-                  <div className="bg-slate-50 dark:bg-slate-800/50 px-5 py-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Credential Metadata</span>
-                    <div className="flex items-center space-x-2">
-                       <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${certificateData.nftStatus.includes("MINTED") ? "bg-accent text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-500"}`}>
-                        Soulbound {certificateData.nftStatus}
-                       </span>
+                {result && (
+                  <div className={`animate-slide-up ${
+                    result === "VALID"
+                      ? 'rounded-xl p-4' 
+                      : 'rounded-xl p-4'
+                  }`} style={{
+                    background: result === "VALID" ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+                    border: `1px solid ${result === "VALID" ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}`
+                  }}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${
+                        result === "VALID" ? 'bg-green-500' : 'bg-red-500'
+                      }`}>
+                        {result === "VALID" ? <IconCheck /> : "!"}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold" style={{
+                          color: result === "VALID" ? '#059669' : '#dc2626'
+                        }}>
+                          {result === "VALID" ? "Authentic Certificate" : result === "INVALID" ? "Invalid Certificate" : "Not Found"}
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {result === "VALID" ? "Verified on Ethereum Sepolia" : "No matching record on-chain"}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <div className="p-5 md:p-6 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      {[
-                        { label: "Student", val: certificateData.studentName },
-                        { label: "Reg No", val: certificateData.regNo },
-                        { label: "Course", val: certificateData.course },
-                        { label: "Achievement", val: certificateData.grade }
-                      ].map(item => (
-                        <div key={item.label}>
-                          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{item.label}</p>
-                          <p className="font-bold text-slate-800 dark:text-white truncate">{item.val}</p>
+                )}
+
+                {certificateData && (
+                  <div className="rounded-xl animate-slide-up overflow-hidden" style={{ border: '1px solid var(--card-border)' }}>
+                    <div className="px-5 py-3 flex items-center justify-between text-xs font-semibold" style={{ background: 'var(--card)', borderBottom: '1px solid var(--card-border)', color: 'var(--text-secondary)' }}>
+                      <span>Credential Details</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        certificateData.nftStatus === "MINTED"
+                          ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20'
+                          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-200 dark:border-zinc-700'
+                      }`}>
+                        {certificateData.nftStatus === "MINTED" ? "Soulbound NFT Minted" : "No NFT"}
+                      </span>
+                    </div>
+                    <div className="p-5 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        {[
+                          { label: "Student", val: certificateData.studentName },
+                          { label: "Reg No", val: certificateData.regNo },
+                          { label: "Course", val: certificateData.course },
+                          { label: "Grade", val: certificateData.grade }
+                        ].map((item) => (
+                          <div key={item.label}>
+                            <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>{item.label}</p>
+                            <p className="text-sm font-semibold truncate">{item.val}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="pt-4" style={{ borderTop: '1px solid var(--card-border)' }}>
+                        <div className="p-3 rounded-lg text-xs font-mono break-all" style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Blockchain Fingerprint</p>
+                          <p className="break-all" style={{ color: 'var(--text-secondary)' }}>{certificateData.certificateHash}</p>
                         </div>
-                      ))}
-                    </div>
-                    <div className="pt-4 border-t border-slate-50 dark:border-slate-800 flex flex-col space-y-3">
-                       <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800/50">
-                          <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Blockchain Digital Fingerprint</p>
-                          <p className="text-[10px] font-mono text-slate-600 dark:text-slate-300 break-all leading-relaxed">{certificateData.certificateHash}</p>
-                       </div>
-                       <a 
-                        href={`https://gateway.pinata.cloud/ipfs/${certificateData.ipfsHash}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn-secondary py-3 px-4 text-xs flex items-center justify-center w-full"
-                      >
-                        Download Source Document ↗
-                      </a>
+                        <a
+                          href={`https://gateway.pinata.cloud/ipfs/${certificateData.ipfsHash}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-secondary w-full mt-3 h-10 text-xs"
+                        >
+                          Download from IPFS <IconExternal />
+                        </a>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
