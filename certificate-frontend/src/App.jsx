@@ -6,8 +6,8 @@ import sameerJson from "./abi/Sameer.json";
 import { generateFileHash, generateCertificateHash } from "./utils/hash";
 import { uploadFileToPinata } from "./utils/pinata";
 
-const REGISTRY_ADDRESS = "0x871086DA3fA39378DDaaae6c2CA79ec1bac5a92C";
-const SAMEER_ADDRESS = "0x3ff7bF2CC03fa79eFd17F19FeeE03Dc0E0973dcA";
+const REGISTRY_ADDRESS = "0x7EDCafbaf62fF54f0AA0475caB4EF8622139c537";
+const SAMEER_ADDRESS = "0xE7ec6a01d163E451237d81cFBD213542fb7b484D";
 
 const REGISTRY_ABI = registryJson.abi || registryJson;
 const SAMEER_ABI = sameerJson.abi || sameerJson;
@@ -174,16 +174,25 @@ export default function App() {
   const fetchAllCertificates = async () => {
     try {
       setIsLoadingAll(true);
-      const data = await gql(`
-        query {
-          certificates {
-            id tokenId studentName regNo course grade certificateHash ipfsHash nftMinted issuedAt
-          }
-        }
-      `);
-      setAllCertificates(data.certificates);
+      const registry = await getContract(REGISTRY_ADDRESS, REGISTRY_ABI);
+      const count = await registry.getCertificatesCount();
+      if (count === 0n) { setAllCertificates([]); return; }
+      const certs = await registry.getCertificates(0, count > 100n ? 100n : count);
+      setAllCertificates(certs.map((c, i) => ({
+        id: String(i),
+        tokenId: "0",
+        studentName: c.studentName,
+        regNo: c.registrationNumber,
+        course: c.course,
+        grade: c.grade,
+        certificateHash: c.certificateHash,
+        ipfsHash: c.ipfsHash,
+        studentAddress: c.issuer,
+        nftMinted: false,
+        issuedAt: Number(c.issuedAt) * 1000,
+      })));
     } catch (err) {
-      console.log("GraphQL not available, showing on-chain data only");
+      console.log("Chain read failed:", err);
       setAllCertificates([]);
     } finally {
       setIsLoadingAll(false);
