@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface ICertificateRegistry {
-    function verifyCertificate(string memory _certificateHash) external view returns (bool);
+    function verifyCertificate(bytes32 _certificateHash) external view returns (bool);
 }
 
 contract Sameer is ERC721, Ownable {
@@ -14,8 +14,8 @@ contract Sameer is ERC721, Ownable {
 
     address public registryAddress;
 
-    mapping(uint256 => string) public certificateHash;
-    mapping(string => bool) public minted; // prevent double NFT
+    mapping(uint256 => bytes32) public certificateHash;
+    mapping(bytes32 => bool) public minted;
 
     constructor(address initialOwner, address _registry)
         ERC721("Certificate Badge", "CBADGE")
@@ -24,17 +24,13 @@ contract Sameer is ERC721, Ownable {
         registryAddress = _registry;
     }
 
-    // -------------------------
-    // MINT NFT (ONLY ADMIN)
-    // -------------------------
     function mintCertificateNFT(
         address student,
-        string memory certHash
+        bytes32 certHash
     ) external onlyOwner returns (uint256) {
 
         require(!minted[certHash], "Already minted");
 
-        // 🔥 CRITICAL: check registry validity
         require(
             ICertificateRegistry(registryAddress).verifyCertificate(certHash),
             "Certificate not valid in registry"
@@ -50,18 +46,13 @@ contract Sameer is ERC721, Ownable {
         return tokenId;
     }
 
-    // -------------------------
-    // SOULBOUND (NO TRANSFER)
-    // -------------------------
     function _update(address to, uint256 tokenId, address auth)
         internal
         override
         returns (address)
     {
         address from = _ownerOf(tokenId);
-
         require(from == address(0), "Soulbound NFT: non-transferable");
-
         return super._update(to, tokenId, auth);
     }
 }

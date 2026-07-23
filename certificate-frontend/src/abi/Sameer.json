@@ -66,8 +66,8 @@
       "outputs": [
         {
           "name": "",
-          "type": "string",
-          "internalType": "string"
+          "type": "bytes32",
+          "internalType": "bytes32"
         }
       ],
       "stateMutability": "view"
@@ -126,8 +126,8 @@
         },
         {
           "name": "certHash",
-          "type": "string",
-          "internalType": "string"
+          "type": "bytes32",
+          "internalType": "bytes32"
         }
       ],
       "outputs": [
@@ -145,8 +145,8 @@
       "inputs": [
         {
           "name": "",
-          "type": "string",
-          "internalType": "string"
+          "type": "bytes32",
+          "internalType": "bytes32"
         }
       ],
       "outputs": [

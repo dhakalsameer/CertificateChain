@@ -11,7 +11,7 @@ contract CertificateRegistry {
     uint256 public totalRevokedCertificates;
 
     event CertificateIssued(
-        string certificateHash,
+        bytes32 certificateHash,
         string studentName,
         string registrationNumber,
         string course,
@@ -21,22 +21,22 @@ contract CertificateRegistry {
         address indexed issuer
     );
 
-    event CertificateRevoked(string certificateHash, address indexed revokedBy);
+    event CertificateRevoked(bytes32 certificateHash, address indexed revokedBy);
 
     struct Certificate {
         string studentName;
         string registrationNumber;
         string course;
         string grade;
-        string certificateHash;
+        bytes32 certificateHash;
         string ipfsHash;
         uint256 issuedAt;
         address issuer;
         bool revoked;
     }
 
-    mapping(string => Certificate) public certificates;
-    string[] public certificateHashes;
+    mapping(bytes32 => Certificate) public certificates;
+    bytes32[] public certificateHashes;
     mapping(address => bool) public admins;
 
     constructor() {
@@ -77,7 +77,7 @@ contract CertificateRegistry {
         string memory _registrationNumber,
         string memory _course,
         string memory _grade,
-        string memory _certificateHash,
+        bytes32 _certificateHash,
         string memory _ipfsHash
     ) public onlyAdmin notPaused {
 
@@ -110,7 +110,7 @@ contract CertificateRegistry {
         );
     }
 
-    function verifyCertificate(string memory _certificateHash)
+    function verifyCertificate(bytes32 _certificateHash)
         public
         view
         returns (bool)
@@ -121,7 +121,7 @@ contract CertificateRegistry {
         return true;
     }
 
-    function getCertificate(string memory _certificateHash)
+    function getCertificate(bytes32 _certificateHash)
         public
         view
         returns (Certificate memory)
@@ -159,7 +159,7 @@ contract CertificateRegistry {
         return certificateHashes.length;
     }
 
-    function revokeCertificate(string memory _certificateHash)
+    function revokeCertificate(bytes32 _certificateHash)
         public
         onlyAdmin
     {

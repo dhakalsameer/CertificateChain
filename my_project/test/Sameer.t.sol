@@ -11,6 +11,8 @@ contract SameerTest is Test {
     Sameer nft;
 
     address user = address(1);
+    bytes32 constant HASH_A = keccak256("cert1");
+    bytes32 constant HASH_B = keccak256("wrong_hash");
 
     function setUp() public {
         registry = new CertificateRegistry();
@@ -20,7 +22,7 @@ contract SameerTest is Test {
             "REG123",
             "Blockchain",
             "A+",
-            "HASH123",
+            HASH_A,
             "ipfs://"
         );
 
@@ -28,14 +30,12 @@ contract SameerTest is Test {
     }
 
     function testMintNFT() public {
-        nft.mintCertificateNFT(user, "HASH123");
-
+        nft.mintCertificateNFT(user, HASH_A);
         assertEq(nft.ownerOf(0), user);
     }
 
     function test_RevertInvalidHash() public {
-    vm.expectRevert("Not found");
-
-    nft.mintCertificateNFT(user, "WRONG_HASH");
-}
+        vm.expectRevert("Not found");
+        nft.mintCertificateNFT(user, HASH_B);
+    }
 }

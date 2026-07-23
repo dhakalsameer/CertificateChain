@@ -50,8 +50,8 @@
       "outputs": [
         {
           "name": "",
-          "type": "string",
-          "internalType": "string"
+          "type": "bytes32",
+          "internalType": "bytes32"
         }
       ],
       "stateMutability": "view"
@@ -62,8 +62,8 @@
       "inputs": [
         {
           "name": "",
-          "type": "string",
-          "internalType": "string"
+          "type": "bytes32",
+          "internalType": "bytes32"
         }
       ],
       "outputs": [
@@ -89,8 +89,8 @@
         },
         {
           "name": "certificateHash",
-          "type": "string",
-          "internalType": "string"
+          "type": "bytes32",
+          "internalType": "bytes32"
         },
         {
           "name": "ipfsHash",
@@ -121,8 +121,8 @@
       "inputs": [
         {
           "name": "_certificateHash",
-          "type": "string",
-          "internalType": "string"
+          "type": "bytes32",
+          "internalType": "bytes32"
         }
       ],
       "outputs": [
@@ -153,8 +153,8 @@
             },
             {
               "name": "certificateHash",
-              "type": "string",
-              "internalType": "string"
+              "type": "bytes32",
+              "internalType": "bytes32"
             },
             {
               "name": "ipfsHash",
@@ -219,8 +219,8 @@
             },
             {
               "name": "certificateHash",
-              "type": "string",
-              "internalType": "string"
+              "type": "bytes32",
+              "internalType": "bytes32"
             },
             {
               "name": "ipfsHash",
@@ -290,8 +290,8 @@
             },
             {
               "name": "certificateHash",
-              "type": "string",
-              "internalType": "string"
+              "type": "bytes32",
+              "internalType": "bytes32"
             },
             {
               "name": "ipfsHash",
@@ -376,8 +376,8 @@
         },
         {
           "name": "_certificateHash",
-          "type": "string",
-          "internalType": "string"
+          "type": "bytes32",
+          "internalType": "bytes32"
         },
         {
           "name": "_ipfsHash",
@@ -440,8 +440,8 @@
       "inputs": [
         {
           "name": "_certificateHash",
-          "type": "string",
-          "internalType": "string"
+          "type": "bytes32",
+          "internalType": "bytes32"
         }
       ],
       "outputs": [],
@@ -499,8 +499,8 @@
       "inputs": [
         {
           "name": "_certificateHash",
-          "type": "string",
-          "internalType": "string"
+          "type": "bytes32",
+          "internalType": "bytes32"
         }
       ],
       "outputs": [
@@ -518,9 +518,9 @@
       "inputs": [
         {
           "name": "certificateHash",
-          "type": "string",
+          "type": "bytes32",
           "indexed": false,
-          "internalType": "string"
+          "internalType": "bytes32"
         },
         {
           "name": "studentName",
@@ -573,9 +573,9 @@
       "inputs": [
         {
           "name": "certificateHash",
-          "type": "string",
+          "type": "bytes32",
           "indexed": false,
-          "internalType": "string"
+          "internalType": "bytes32"
         },
         {
           "name": "revokedBy",

@@ -10,6 +10,10 @@ contract CertificateRegistryTest is Test {
     address public admin = address(2);
     address public student = address(3);
 
+    bytes32 constant HASH_A = keccak256("cert1");
+    bytes32 constant HASH_B = keccak256("cert2");
+    bytes32 constant HASH_C = keccak256("nonexistent");
+
     function setUp() public {
         vm.prank(owner);
         registry = new CertificateRegistry();
@@ -24,7 +28,7 @@ contract CertificateRegistryTest is Test {
             "BCT-2078-045",
             "Blockchain Engineering",
             "A+",
-            "hash123",
+            HASH_A,
             "ipfs123"
         );
 
@@ -33,16 +37,16 @@ contract CertificateRegistryTest is Test {
             string memory regNo,
             ,
             ,
-            string memory certHash,
+            bytes32 certHash,
             ,
             uint256 issuedAt,
             address issuer,
             bool revoked
-        ) = registry.certificates("hash123");
+        ) = registry.certificates(HASH_A);
 
         assertEq(name, "Sameer Dhakal");
         assertEq(regNo, "BCT-2078-045");
-        assertEq(certHash, "hash123");
+        assertEq(certHash, HASH_A);
         assertEq(issuedAt, block.timestamp);
         assertEq(issuer, admin);
         assertFalse(revoked);
@@ -55,16 +59,16 @@ contract CertificateRegistryTest is Test {
             "BCT-2078-045",
             "Blockchain Engineering",
             "A+",
-            "hash123",
+            HASH_A,
             "ipfs123"
         );
 
-        assertTrue(registry.verifyCertificate("hash123"));
+        assertTrue(registry.verifyCertificate(HASH_A));
     }
 
     function test_Revert_VerifyNonExistent() public {
         vm.expectRevert("Not found");
-        registry.verifyCertificate("nonexistent");
+        registry.verifyCertificate(HASH_C);
     }
 
     function test_RevokeCertificate() public {
@@ -74,23 +78,23 @@ contract CertificateRegistryTest is Test {
             "BCT-2078-045",
             "Blockchain Engineering",
             "A+",
-            "hash123",
+            HASH_A,
             "ipfs123"
         );
 
         vm.prank(admin);
-        registry.revokeCertificate("hash123");
+        registry.revokeCertificate(HASH_A);
 
-        (,,,,,,,, bool revoked) = registry.certificates("hash123");
+        (,,,,,,,, bool revoked) = registry.certificates(HASH_A);
         assertTrue(revoked);
     }
 
     function test_Revert_IssueDuplicate() public {
         vm.prank(admin);
-        registry.issueCertificate("N1", "R1", "C1", "G1", "H1", "I1");
-        
+        registry.issueCertificate("N1", "R1", "C1", "G1", HASH_A, "I1");
+
         vm.expectRevert("Exists");
         vm.prank(admin);
-        registry.issueCertificate("N1", "R1", "C1", "G1", "H1", "I1");
+        registry.issueCertificate("N1", "R1", "C1", "G1", HASH_A, "I1");
     }
 }

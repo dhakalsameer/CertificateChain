@@ -6,14 +6,18 @@ import sameerJson from "./abi/Sameer.json";
 import { generateFileHash, generateCertificateHash } from "./utils/hash";
 import { uploadFileToPinata } from "./utils/pinata";
 
-const REGISTRY_ADDRESS = "0x7EDCafbaf62fF54f0AA0475caB4EF8622139c537";
-const SAMEER_ADDRESS = "0xE7ec6a01d163E451237d81cFBD213542fb7b484D";
+const REGISTRY_ADDRESS = "0x4445E3602efd43224baf9CD7855e5400B3d5e8Ae";
+const SAMEER_ADDRESS = "0x84385B1a61dF065eb558fD95374f44EE21509aF2";
 
 const REGISTRY_ABI = registryJson.abi || registryJson;
 const SAMEER_ABI = sameerJson.abi || sameerJson;
 
 const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || "http://localhost:4000/graphql";
 const RPC_URL = import.meta.env.VITE_RPC_URL || "https://eth-sepolia.g.alchemy.com/v2/alch_N1z03oA4LzVxngax--cjz";
+
+function toBytes32(hex) {
+  return hex?.startsWith("0x") ? hex : "0x" + hex;
+}
 
 async function gql(query, variables = {}) {
   const res = await fetch(GRAPHQL_URL, {
@@ -317,7 +321,7 @@ export default function App() {
     setAdminMsg(null);
     try {
       const registry = await getContract(REGISTRY_ADDRESS, REGISTRY_ABI);
-      const tx = await registry.revokeCertificate(revokeHash);
+      const tx = await registry.revokeCertificate(toBytes32(revokeHash));
       await tx.wait();
       setAdminMsg({ type: "success", text: "Certificate revoked on-chain" });
       setRevokeHash("");
@@ -411,20 +415,21 @@ export default function App() {
 
       const fileHash = issueHash || await generateFileHash(issueFile);
       const certHash = generateCertificateHash({ ...form, fileHash });
+      const certHashB = toBytes32(certHash);
       const ipfsHash = await uploadFileToPinata(issueFile, {
         name: `Cert: ${form.studentName}`,
         keyvalues: { student: form.studentName, reg: form.regNo }
       });
 
       const tx1 = await registry.issueCertificate(
-        form.studentName, form.regNo, form.course, form.grade, certHash, ipfsHash
+        form.studentName, form.regNo, form.course, form.grade, certHashB, ipfsHash
       );
       await tx1.wait();
 
       let nftSuccess = false;
       let tokenId = "0";
       try {
-        const tx2 = await sameer.mintCertificateNFT(form.studentAddress, certHash);
+        const tx2 = await sameer.mintCertificateNFT(form.studentAddress, certHashB);
         const receipt = await tx2.wait();
         const transferLog = receipt.logs.find(l => l.topics[0] === sameer.interface.getEvent("Transfer").topicHash);
         if (transferLog) {
@@ -468,7 +473,8 @@ export default function App() {
       const registry = await getContract(REGISTRY_ADDRESS, REGISTRY_ABI);
       const sameer = await getContract(SAMEER_ADDRESS, SAMEER_ABI);
 
-      const valid = await registry.verifyCertificate(hashToVerify);
+      const hashB = toBytes32(hashToVerify);
+      const valid = await registry.verifyCertificate(hashB);
 
       if (!valid) {
         setResult("INVALID");
@@ -476,8 +482,8 @@ export default function App() {
         return;
       }
 
-      const cert = await registry.getCertificate(hashToVerify);
-      const nftMinted = await sameer.minted(hashToVerify);
+      const cert = await registry.getCertificate(hashB);
+      const nftMinted = await sameer.minted(hashB);
 
       setCertificateData({
         studentName: cert.studentName,
