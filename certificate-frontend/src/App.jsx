@@ -13,6 +13,7 @@ const REGISTRY_ABI = registryJson.abi || registryJson;
 const SAMEER_ABI = sameerJson.abi || sameerJson;
 
 const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || "http://localhost:4000/graphql";
+const RPC_URL = import.meta.env.VITE_RPC_URL || "https://eth-sepolia.g.alchemy.com/v2/alch_N1z03oA4LzVxngax--cjz";
 
 async function gql(query, variables = {}) {
   const res = await fetch(GRAPHQL_URL, {
@@ -290,7 +291,7 @@ export default function App() {
       const signer = await provider.getSigner();
       return new Contract(address, abi, signer);
     }
-    const provider = new ethers.JsonRpcProvider("https://rpc.sepolia.org");
+    const provider = new ethers.JsonRpcProvider(RPC_URL);
     return new Contract(address, abi, provider);
   };
 
