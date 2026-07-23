@@ -386,7 +386,7 @@ export default function App() {
   };
 
   const getContract = async (address, abi) => {
-    if (window.ethereum) {
+    if (window.ethereum && account) {
       const provider = new BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       return new Contract(address, abi, signer);
