@@ -3,7 +3,7 @@ import { ethers, BrowserProvider, Contract } from "ethers";
 
 import registryJson from "./abi/CertificateRegistry.json";
 import sameerJson from "./abi/Sameer.json";
-import { generateFileHash } from "./utils/hash";
+import { generateFileHash, generateCertificateHash } from "./utils/hash";
 import { uploadFileToPinata } from "./utils/pinata";
 
 const REGISTRY_ADDRESS = "0x871086DA3fA39378DDaaae6c2CA79ec1bac5a92C";
@@ -326,7 +326,8 @@ export default function App() {
       const registry = await getContract(REGISTRY_ADDRESS, REGISTRY_ABI);
       const sameer = await getContract(SAMEER_ADDRESS, SAMEER_ABI);
 
-      const certHash = issueHash || await generateFileHash(issueFile);
+      const fileHash = issueHash || await generateFileHash(issueFile);
+      const certHash = generateCertificateHash({ ...form, fileHash });
       const ipfsHash = await uploadFileToPinata(issueFile, {
         name: `Cert: ${form.studentName}`,
         keyvalues: { student: form.studentName, reg: form.regNo }
