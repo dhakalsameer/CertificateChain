@@ -690,6 +690,13 @@ export default function App() {
                             {new Date(cert.issuedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                           </span>
                           <div className="flex gap-3">
+                            <button
+                              onClick={() => { setVerifyHash(cert.certificateHash); setVerifyFile(null); setGeneratedVerifyHash(""); setResult(""); setCertificateData(null); setActiveTab("verify"); }}
+                              className="text-xs font-semibold inline-flex items-center gap-1 hover:text-emerald-500 transition-colors"
+                              style={{ color: 'var(--text-secondary)' }}
+                            >
+                              Verify
+                            </button>
                             <a
                               href={`https://sepolia.etherscan.io/token/${SAMEER_ADDRESS}?a=${cert.tokenId}`}
                               target="_blank"
