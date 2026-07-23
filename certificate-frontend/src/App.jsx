@@ -149,15 +149,6 @@ export default function App() {
 
   useEffect(() => {
     if (window.ethereum) {
-      window.ethereum.request({ method: 'eth_accounts' }).then(accounts => {
-        if (accounts.length > 0) {
-          const acc = accounts[0];
-          setAccount(acc);
-          checkAdminStatus(acc);
-          fetchMyCertificates(acc);
-        }
-      });
-
       window.ethereum.on("accountsChanged", (accounts) => {
         const newAccount = accounts[0] || "";
         setAccount(newAccount);
@@ -172,6 +163,7 @@ export default function App() {
         }
       });
     }
+    fetchAllCertificates();
   }, []);
 
   useEffect(() => {
