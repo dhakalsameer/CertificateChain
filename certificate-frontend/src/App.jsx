@@ -109,6 +109,15 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [allCertificates, setAllCertificates] = useState([]);
   const [isLoadingAll, setIsLoadingAll] = useState(true);
+  const [adminTab, setAdminTab] = useState("issue");
+  const [revokeHash, setRevokeHash] = useState("");
+  const [isRevoking, setIsRevoking] = useState(false);
+  const [newAdminAddr, setNewAdminAddr] = useState("");
+  const [removeAdminAddr, setRemoveAdminAddr] = useState("");
+  const [isAddingAdmin, setIsAddingAdmin] = useState(false);
+  const [isRemovingAdmin, setIsRemovingAdmin] = useState(false);
+  const [contractStats, setContractStats] = useState(null);
+  const [adminMsg, setAdminMsg] = useState(null);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -274,10 +283,75 @@ export default function App() {
       }
 
       setIsAdmin(!!status);
+      if (status) fetchContractStats();
     } catch (err) {
       console.error("Admin Check Error:", err);
       setIsAdmin(false);
     }
+  };
+
+  const fetchContractStats = async () => {
+    try {
+      const registry = await getContract(REGISTRY_ADDRESS, REGISTRY_ABI);
+      const [total, admins, revoked] = await Promise.all([
+        registry.totalCertificates(),
+        registry.totalAdmins(),
+        registry.totalRevokedCertificates(),
+      ]);
+      setContractStats({ total: total.toString(), admins: admins.toString(), revoked: revoked.toString() });
+    } catch { setContractStats(null); }
+  };
+
+  const actRevoke = async () => {
+    if (!revokeHash) return;
+    setIsRevoking(true);
+    setAdminMsg(null);
+    try {
+      const registry = await getContract(REGISTRY_ADDRESS, REGISTRY_ABI);
+      const tx = await registry.revokeCertificate(revokeHash);
+      await tx.wait();
+      setAdminMsg({ type: "success", text: "Certificate revoked on-chain" });
+      setRevokeHash("");
+      fetchContractStats();
+      fetchAllCertificates();
+    } catch (err) {
+      setAdminMsg({ type: "error", text: err?.reason || err?.message || "Revoke failed" });
+    }
+    setIsRevoking(false);
+  };
+
+  const actAddAdmin = async () => {
+    if (!ethers.isAddress(newAdminAddr)) { setAdminMsg({ type: "error", text: "Invalid address" }); return; }
+    setIsAddingAdmin(true);
+    setAdminMsg(null);
+    try {
+      const registry = await getContract(REGISTRY_ADDRESS, REGISTRY_ABI);
+      const tx = await registry.addAdmin(newAdminAddr);
+      await tx.wait();
+      setAdminMsg({ type: "success", text: `Admin added: ${newAdminAddr.slice(0, 6)}...` });
+      setNewAdminAddr("");
+      fetchContractStats();
+    } catch (err) {
+      setAdminMsg({ type: "error", text: err?.reason || err?.message || "Failed to add admin" });
+    }
+    setIsAddingAdmin(false);
+  };
+
+  const actRemoveAdmin = async () => {
+    if (!ethers.isAddress(removeAdminAddr)) { setAdminMsg({ type: "error", text: "Invalid address" }); return; }
+    setIsRemovingAdmin(true);
+    setAdminMsg(null);
+    try {
+      const registry = await getContract(REGISTRY_ADDRESS, REGISTRY_ABI);
+      const tx = await registry.removeAdmin(removeAdminAddr);
+      await tx.wait();
+      setAdminMsg({ type: "success", text: `Admin removed: ${removeAdminAddr.slice(0, 6)}...` });
+      setRemoveAdminAddr("");
+      fetchContractStats();
+    } catch (err) {
+      setAdminMsg({ type: "error", text: err?.reason || err?.message || "Failed to remove admin" });
+    }
+    setIsRemovingAdmin(false);
   };
 
   const connectWallet = async () => {
@@ -354,6 +428,8 @@ export default function App() {
 
       setIssued({ certHash, ipfsHash, nftSuccess });
       syncCertificateToGraphql(tokenId, form, certHash, ipfsHash, nftSuccess);
+      fetchContractStats();
+      setAdminTab("credentials");
       setForm({ studentName: "", regNo: "", course: "", grade: "", studentAddress: "" });
       setIssueFile(null);
       setIssueHash("");
@@ -632,115 +708,196 @@ export default function App() {
 
             {isAdmin && (
               <div className="card-elevated p-6 sm:p-8 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-                <div className="flex items-center gap-3 mb-8">
+                <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
-                    <IconPlus />
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                      <path d="M12 3L4 7v5c0 5.25 3.83 10.08 8 11 4.17-.92 8-5.75 8-11V7l-8-4z" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold">Issue Certificate</h2>
-                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Authorized Issuance Console</p>
+                    <h2 className="text-lg font-bold">Admin Panel</h2>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Manage credentials and contract</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                {contractStats && (
+                  <div className="flex gap-3 mb-6 text-xs flex-wrap">
+                    <span className="px-3 py-1.5 rounded-lg font-semibold" style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
+                      Total: <span className="text-purple-600 dark:text-purple-400">{contractStats.total}</span>
+                    </span>
+                    <span className="px-3 py-1.5 rounded-lg font-semibold" style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
+                      Admins: <span className="text-purple-600 dark:text-purple-400">{contractStats.admins}</span>
+                    </span>
+                    <span className="px-3 py-1.5 rounded-lg font-semibold" style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
+                      Revoked: <span className="text-red-500">{contractStats.revoked}</span>
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex gap-1 p-1 mb-6 rounded-xl" style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
                   {[
-                    { label: "Student Name", name: "studentName", placeholder: "e.g. Sameer Dhakal" },
-                    { label: "Registration ID", name: "regNo", placeholder: "e.g. GUST3030" },
-                    { label: "Course Title", name: "course", placeholder: "e.g. BSc.CSIT" },
-                    { label: "Grade", name: "grade", placeholder: "e.g. B+" },
-                    { label: "Student Wallet", name: "studentAddress", placeholder: "0x..." }
-                  ].map((field) => (
-                    <div key={field.name} className={`space-y-1 ${field.name === "studentAddress" ? "sm:col-span-2" : ""}`}>
-                      <label className="label">{field.label}</label>
-                      <input
-                        name={field.name}
-                        value={form[field.name]}
-                        onChange={handleChange}
-                        placeholder={field.placeholder}
-                        className="input"
-                      />
-                    </div>
+                    { key: "credentials", label: "All Credentials" },
+                    { key: "issue", label: "Issue" },
+                    { key: "revoke", label: "Revoke" },
+                    { key: "admins", label: "Admins" },
+                  ].map(t => (
+                    <button key={t.key} onClick={() => { setAdminTab(t.key); setAdminMsg(null); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        adminTab === t.key
+                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm'
+                          : 'hover:text-purple-500'
+                      }`}
+                      style={{ color: adminTab === t.key ? 'white' : 'var(--text-secondary)' }}
+                    >
+                      {t.label}
+                    </button>
                   ))}
                 </div>
 
-                <div className="mb-6">
-                  <label className="label mb-2">Certificate Document</label>
-                  <div className="relative group">
-                    <input
-                      type="file"
-                      onChange={(e) => setIssueFile(e.target.files[0])}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                    />
-                    <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-dashed transition-all group-hover:border-purple-400 group-hover:bg-purple-500/5" style={{ borderColor: 'var(--input-border)', background: 'var(--input-bg)' }}>
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'var(--card)' }}>
-                        <IconUpload />
+                {adminMsg && (
+                  <div className={`mb-4 p-3 rounded-xl text-xs font-semibold animate-slide-up ${
+                    adminMsg.type === "success" ? 'text-green-600 dark:text-green-400' : 'text-red-500'
+                  }`} style={{
+                    background: adminMsg.type === "success" ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+                    border: `1px solid ${adminMsg.type === "success" ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}`
+                  }}>
+                    {adminMsg.text}
+                  </div>
+                )}
+
+                {adminTab === "credentials" && (
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                    {allCertificates.length > 0 ? (
+                      allCertificates.map((cert, i) => (
+                        <div key={cert.id} className="p-4 rounded-xl animate-slide-up" style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <h3 className="text-sm font-bold">{cert.studentName}</h3>
+                              <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{cert.course} &middot; {cert.regNo}</p>
+                            </div>
+                            <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-purple-500/10 to-pink-500/10 text-purple-600 dark:text-purple-400">
+                              #{cert.tokenId}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid var(--card-border)' }}>
+                            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                              {new Date(cert.issuedAt).toLocaleDateString()}
+                            </span>
+                            <a href={`https://sepolia.etherscan.io/token/${SAMEER_ADDRESS}?a=${cert.tokenId}`} target="_blank" rel="noreferrer" className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 hover:underline">
+                              Explorer
+                            </a>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-8 text-center">
+                        <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>No certificates in database</p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Issue one to see it appear here</p>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                          {issueFile ? issueFile.name : "Choose a file or drag here"}
-                        </p>
-                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          PDF, PNG, JPG up to 10MB
-                        </p>
+                    )}
+                  </div>
+                )}
+
+                {adminTab === "issue" && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                      {[
+                        { label: "Student Name", name: "studentName", placeholder: "e.g. Sameer Dhakal" },
+                        { label: "Registration ID", name: "regNo", placeholder: "e.g. GUST3030" },
+                        { label: "Course Title", name: "course", placeholder: "e.g. BSc.CSIT" },
+                        { label: "Grade", name: "grade", placeholder: "e.g. B+" },
+                        { label: "Student Wallet", name: "studentAddress", placeholder: "0x..." }
+                      ].map((field) => (
+                        <div key={field.name} className={`space-y-1 ${field.name === "studentAddress" ? "sm:col-span-2" : ""}`}>
+                          <label className="label">{field.label}</label>
+                          <input name={field.name} value={form[field.name]} onChange={handleChange} placeholder={field.placeholder} className="input" />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mb-6">
+                      <label className="label mb-2">Certificate Document</label>
+                      <div className="relative group">
+                        <input type="file" onChange={(e) => setIssueFile(e.target.files[0])} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                        <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-dashed transition-all group-hover:border-purple-400 group-hover:bg-purple-500/5" style={{ borderColor: 'var(--input-border)', background: 'var(--input-bg)' }}>
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'var(--card)' }}>
+                            <IconUpload />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{issueFile ? issueFile.name : "Choose a file or drag here"}</p>
+                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>PDF, PNG, JPG up to 10MB</p>
+                          </div>
+                          {issueFile && (
+                            <button onClick={(e) => { e.stopPropagation(); setIssueFile(null); }} className="text-xs font-semibold px-3 py-1 rounded-lg hover:bg-red-500/10" style={{ color: '#ef4444' }}>Remove</button>
+                          )}
+                        </div>
                       </div>
-                      {issueFile && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setIssueFile(null); }}
-                          className="text-xs font-semibold px-3 py-1 rounded-lg hover:bg-red-500/10"
-                          style={{ color: '#ef4444' }}
-                        >
-                          Remove
-                        </button>
+                      {issueHash && (
+                        <div className="mt-3 flex items-center gap-2 p-3 rounded-lg text-xs font-mono" style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
+                          <span className="font-medium" style={{ color: 'var(--text-muted)' }}>SHA-256:</span>
+                          <span className="truncate" style={{ color: 'var(--text-secondary)' }}>{issueHash}</span>
+                          <button onClick={() => copyToClipboard(issueHash)} className="shrink-0 hover:text-purple-500 transition-colors" style={{ color: 'var(--text-muted)' }}>
+                            {copied ? <span className="text-green-500 text-xs font-medium">Copied!</span> : <IconCopy />}
+                          </button>
+                        </div>
                       )}
                     </div>
-                  </div>
-                  {issueHash && (
-                    <div className="mt-3 flex items-center gap-2 p-3 rounded-lg text-xs font-mono" style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
-                      <span className="font-medium" style={{ color: 'var(--text-muted)' }}>SHA-256:</span>
-                      <span className="truncate" style={{ color: 'var(--text-secondary)' }}>{issueHash}</span>
-                      <button onClick={() => copyToClipboard(issueHash)} className="shrink-0 hover:text-purple-500 transition-colors" style={{ color: 'var(--text-muted)' }}>
-                        {copied ? <span className="text-green-500 text-xs font-medium">Copied!</span> : <IconCopy />}
-                      </button>
-                    </div>
-                  )}
-                </div>
 
-                <button
-                  onClick={issueCertificate}
-                  disabled={isIssuing}
-                  className="btn btn-primary w-full h-12"
-                >
-                  {isIssuing ? (
-                    <>
-                      <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    "Issue & Mint NFT"
-                  )}
-                </button>
+                    <button onClick={issueCertificate} disabled={isIssuing} className="btn btn-primary w-full h-12">
+                      {isIssuing ? (
+                        <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Processing...</>
+                      ) : "Issue & Mint NFT"}
+                    </button>
 
-                {issued && (
-                  <div className="mt-4 p-4 rounded-xl animate-slide-up" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white">
-                        <IconCheck />
+                    {issued && (
+                      <div className="mt-4 p-4 rounded-xl animate-slide-up" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white"><IconCheck /></div>
+                          <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+                            {issued.nftSuccess ? "Certificate Issued & NFT Minted" : "Certificate Issued"}
+                          </span>
+                        </div>
+                        <div className="text-xs font-mono break-all opacity-70 mb-2" style={{ color: 'var(--text-secondary)' }}>{issued.certHash}</div>
+                        <a href={`https://gateway.pinata.cloud/ipfs/${issued.ipfsHash}`} target="_blank" rel="noreferrer" className="text-xs font-semibold inline-flex items-center gap-1 text-purple-600 dark:text-purple-400 hover:underline">
+                          View on IPFS <IconExternal />
+                        </a>
                       </div>
-                      <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                        {issued.nftSuccess ? "Certificate Issued & NFT Minted" : "Certificate Issued"}
-                      </span>
+                    )}
+                  </>
+                )}
+
+                {adminTab === "revoke" && (
+                  <div className="space-y-4">
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Enter the certificate hash to revoke it on-chain.</p>
+                    <input value={revokeHash} onChange={(e) => setRevokeHash(e.target.value)} placeholder="0x... certificate hash" className="input" />
+                    <button onClick={actRevoke} disabled={isRevoking} className="btn btn-primary w-full h-12" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                      {isRevoking ? (
+                        <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Revoking...</>
+                      ) : "Revoke Certificate"}
+                    </button>
+                  </div>
+                )}
+
+                {adminTab === "admins" && (
+                  <div className="space-y-6">
+                    <div>
+                      <label className="label mb-2">Add Admin</label>
+                      <div className="flex gap-2">
+                        <input value={newAdminAddr} onChange={(e) => setNewAdminAddr(e.target.value)} placeholder="0x... wallet address" className="input flex-1" />
+                        <button onClick={actAddAdmin} disabled={isAddingAdmin} className="btn btn-primary shrink-0">
+                          {isAddingAdmin ? "Adding..." : "Add"}
+                        </button>
+                      </div>
                     </div>
-                    <div className="text-xs font-mono break-all opacity-70 mb-2" style={{ color: 'var(--text-secondary)' }}>
-                      {issued.certHash}
+                    <div>
+                      <label className="label mb-2">Remove Admin</label>
+                      <div className="flex gap-2">
+                        <input value={removeAdminAddr} onChange={(e) => setRemoveAdminAddr(e.target.value)} placeholder="0x... wallet address" className="input flex-1" />
+                        <button onClick={actRemoveAdmin} disabled={isRemovingAdmin} className="btn btn-primary shrink-0" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                          {isRemovingAdmin ? "Removing..." : "Remove"}
+                        </button>
+                      </div>
                     </div>
-                    <a
-                      href={`https://gateway.pinata.cloud/ipfs/${issued.ipfsHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs font-semibold inline-flex items-center gap-1 text-purple-600 dark:text-purple-400 hover:underline"
-                    >
-                      View on IPFS <IconExternal />
-                    </a>
                   </div>
                 )}
               </div>
